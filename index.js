@@ -177,16 +177,20 @@ app.post('/notify', async (req, res) => {
   }
 });
 
-// Add-on Chat response: post a message back into the space the click came from.
-function chatReply(text) {
-  return {
-    hostAppDataAction: {
-      chatDataAction: { createMessageAction: { message: { text } } },
-    },
-  };
+/** Post a plain-text message into the approval space via the Chat REST API. */
+async function postToSpace(text) {
+  try {
+    await chat.spaces.messages.create({ parent: CHAT_SPACE, requestBody: { text } });
+  } catch (err) {
+    console.error('post to space failed', err?.message || err);
+  }
 }
 
 // ── / — Google Chat interaction events (Workspace add-on format) ─────────────
+// Add-on apps reject anything that isn't a valid RenderActions/DataActions/Card
+// response, so we ACK every request with an empty {} (a valid no-op) and do the
+// real work out-of-band, posting the outcome back via the Chat API that already
+// works for /notify. This sidesteps the finicky add-on action-response schema.
 app.post('/', async (req, res) => {
   try {
     await verifyChatRequest(req);
@@ -196,8 +200,8 @@ app.post('/', async (req, res) => {
   }
 
   // Workspace add-on Chat events arrive as { commonEventObject, chat, ... }.
-  // A button click puts the button's function in commonEventObject.invokedFunction
-  // and the button's parameters (a key→value map) in commonEventObject.parameters.
+  // A button click puts the function in commonEventObject.invokedFunction and the
+  // button parameters (a key→value map) in commonEventObject.parameters.
   const body = req.body || {};
   const ceo = body.commonEventObject || {};
   const fn = ceo.invokedFunction;
@@ -205,11 +209,11 @@ app.post('/', async (req, res) => {
   const userEmail = body.chat?.user?.email || '';
   console.log('CHAT interaction:', fn || '(none)', '| user:', userEmail, '| params:', JSON.stringify(params));
 
-  // Anything that isn't an approve/reject click (added-to-space, message, etc.)
-  // just gets an empty 200 — nothing to do.
-  if (fn !== 'approve' && fn !== 'reject') {
-    return res.json({});
-  }
+  // Acknowledge Google immediately with a valid empty response.
+  res.json({});
+
+  // Only approve/reject clicks do anything.
+  if (fn !== 'approve' && fn !== 'reject') return;
 
   const approve = fn === 'approve';
   const { buildUrl, inputId, service, build } = params;
@@ -217,7 +221,8 @@ app.post('/', async (req, res) => {
   try {
     // Authorization lives in the Google Group — only approvers may clear the gate.
     if (!(await isApprover(userEmail))) {
-      return res.json(chatReply(`⛔ ${userEmail} is not in ${APPROVERS_GROUP} — not authorised to approve deployments.`));
+      await postToSpace(`⛔ ${userEmail} is not in ${APPROVERS_GROUP} — not authorised to approve deployments.`);
+      return;
     }
 
     const crumb = await jenkins.crumb();
@@ -227,10 +232,10 @@ app.post('/', async (req, res) => {
     await jenkins.decideInput(buildUrl, inputId, approve, crumb);
 
     const verb = approve ? '✅ APPROVED' : '⛔ REJECTED';
-    return res.json(chatReply(`${verb} — ${service} #${build} by ${userEmail}`));
+    await postToSpace(`${verb} — ${service} #${build} by ${userEmail}`);
   } catch (err) {
     console.error('decision failed', err);
-    return res.json(chatReply(`⚠️ Could not record the decision for ${service} #${build}: ${err.message}. Use the Jenkins UI.`));
+    await postToSpace(`⚠️ Could not record the decision for ${service} #${build}: ${err.message}. Use the Jenkins UI.`);
   }
 });
 
