@@ -21,6 +21,7 @@
  * of truth for who may approve — whether they click in Jenkins or in Chat.
  */
 
+import 'dotenv/config.js';
 import express from 'express';
 import { OAuth2Client } from 'google-auth-library';
 import { google } from 'googleapis';
