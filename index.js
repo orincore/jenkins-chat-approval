@@ -130,7 +130,7 @@ async function isApprover(userEmail) {
 }
 
 /** Build the interactive approval card. `params` round-trips on every button. */
-function approvalCard({ service, build, releaseTs, buildUrl, inputId, footer }) {
+function approvalCard({ service, build, releaseTs, buildUrl, inputId, changes, footer }) {
   const shared = { buildUrl, inputId, service, build, releaseTs: releaseTs || '' };
   const action = (act) => ({
     action: {
@@ -156,6 +156,7 @@ function approvalCard({ service, build, releaseTs, buildUrl, inputId, footer }) 
             { decoratedText: { topLabel: 'Service', text: service } },
             { decoratedText: { topLabel: 'Build', text: `#${build}` } },
             { decoratedText: { topLabel: 'Release', text: releaseTs } },
+            ...(changes ? [{ textParagraph: { text: `<b>Changes in this update</b><br>${String(changes).replace(/\n/g, '<br>')}` } }] : []),
             { buttonList: { buttons: [
               { text: 'Approve & Deploy', color: { red: 0.18, green: 0.49, blue: 0.20 }, onClick: action('approve') },
               { text: 'Reject', color: { red: 0.78, green: 0.16, blue: 0.16 }, onClick: action('reject') },
@@ -173,12 +174,12 @@ app.post('/notify', async (req, res) => {
   if (!APPROVAL_SHARED_SECRET || req.headers['x-approval-secret'] !== APPROVAL_SHARED_SECRET) {
     return res.status(401).json({ error: 'unauthorized' });
   }
-  const { service, build, releaseTs, buildUrl, inputId } = req.body || {};
+  const { service, build, releaseTs, buildUrl, inputId, changes } = req.body || {};
   if (!service || !build || !buildUrl || !inputId) {
     return res.status(400).json({ error: 'service, build, buildUrl and inputId are required' });
   }
   try {
-    const card = approvalCard({ service, build, releaseTs, buildUrl, inputId });
+    const card = approvalCard({ service, build, releaseTs, buildUrl, inputId, changes });
     const result = await chat.spaces.messages.create({ parent: CHAT_SPACE, requestBody: card });
     return res.json({ ok: true, message: result.data.name });
   } catch (err) {
