@@ -177,57 +177,60 @@ app.post('/notify', async (req, res) => {
   }
 });
 
-// ── / — Google Chat interaction events (button clicks) ──────────────────────
+// Add-on Chat response: post a message back into the space the click came from.
+function chatReply(text) {
+  return {
+    hostAppDataAction: {
+      chatDataAction: { createMessageAction: { message: { text } } },
+    },
+  };
+}
+
+// ── / — Google Chat interaction events (Workspace add-on format) ─────────────
 app.post('/', async (req, res) => {
-  let caller;
   try {
-    caller = await verifyChatRequest(req);
+    await verifyChatRequest(req);
   } catch (err) {
     console.warn('rejected Chat request', err.message);
     return res.status(401).send('unauthorized');
   }
 
-  const event = req.body || {};
-  if (event.type !== 'CARD_CLICKED') {
-    return res.json({ text: 'Cred2Tech deployment approver is online.' });
+  // Workspace add-on Chat events arrive as { commonEventObject, chat, ... }.
+  // A button click puts the button's function in commonEventObject.invokedFunction
+  // and the button's parameters (a key→value map) in commonEventObject.parameters.
+  const body = req.body || {};
+  const ceo = body.commonEventObject || {};
+  const fn = ceo.invokedFunction;
+  const params = ceo.parameters || {};
+  const userEmail = body.chat?.user?.email || '';
+  console.log('CHAT interaction:', fn || '(none)', '| user:', userEmail, '| params:', JSON.stringify(params));
+
+  // Anything that isn't an approve/reject click (added-to-space, message, etc.)
+  // just gets an empty 200 — nothing to do.
+  if (fn !== 'approve' && fn !== 'reject') {
+    return res.json({});
   }
 
-  const fn = event.common?.invokedFunction; // 'approve' | 'reject'
-  const params = Object.fromEntries((event.common?.parameters ? Object.entries(event.common.parameters) : []));
-  const userEmail = event.user?.email || caller.email;
   const approve = fn === 'approve';
+  const { buildUrl, inputId, service, build } = params;
 
   try {
+    // Authorization lives in the Google Group — only approvers may clear the gate.
     if (!(await isApprover(userEmail))) {
-      return res.json({
-        actionResponse: { type: 'NEW_MESSAGE' },
-        text: `:no_entry: ${userEmail} is not a member of ${APPROVERS_GROUP} and cannot approve deployments.`,
-      });
+      return res.json(chatReply(`⛔ ${userEmail} is not in ${APPROVERS_GROUP} — not authorised to approve deployments.`));
     }
 
-    const { buildUrl, inputId, service, build } = params;
     const crumb = await jenkins.crumb();
-    const stamp = `Approved via Google Chat by ${userEmail}`;
-    if (approve) await jenkins.setBuildDescription(buildUrl, stamp, crumb);
+    if (approve) {
+      await jenkins.setBuildDescription(buildUrl, `Approved via Google Chat by ${userEmail}`, crumb);
+    }
     await jenkins.decideInput(buildUrl, inputId, approve, crumb);
 
-    const verb = approve ? 'APPROVED ✅' : 'REJECTED ⛔';
-    const when = new Date().toISOString();
-    // Replace the original card so nobody double-acts on it.
-    return res.json({
-      actionResponse: { type: 'UPDATE_MESSAGE' },
-      ...approvalCard({
-        service, build, releaseTs: params.releaseTs || '',
-        buildUrl, inputId,
-        footer: `<b>${verb}</b> by ${userEmail}<br>${when}`,
-      }),
-    });
+    const verb = approve ? '✅ APPROVED' : '⛔ REJECTED';
+    return res.json(chatReply(`${verb} — ${service} #${build} by ${userEmail}`));
   } catch (err) {
     console.error('decision failed', err);
-    return res.json({
-      actionResponse: { type: 'NEW_MESSAGE' },
-      text: `:warning: Could not record the decision for ${params.service} #${params.build}: ${err.message}. Use the Jenkins UI.`,
-    });
+    return res.json(chatReply(`⚠️ Could not record the decision for ${service} #${build}: ${err.message}. Use the Jenkins UI.`));
   }
 });
 
