@@ -187,6 +187,23 @@ app.post('/notify', async (req, res) => {
   }
 });
 
+// ── /post — Jenkins posts a plain status message (deploy result, etc.) ───────
+// Shared-secret protected, same as /notify. Body: { "text": "..." }.
+app.post('/post', async (req, res) => {
+  if (!APPROVAL_SHARED_SECRET || req.headers['x-approval-secret'] !== APPROVAL_SHARED_SECRET) {
+    return res.status(401).json({ error: 'unauthorized' });
+  }
+  const { text } = req.body || {};
+  if (!text) return res.status(400).json({ error: 'text is required' });
+  try {
+    await chat.spaces.messages.create({ parent: CHAT_SPACE, requestBody: { text } });
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error('post failed', err);
+    return res.status(500).json({ error: 'failed to post' });
+  }
+});
+
 // Add-on Chat response: create a new message in the space the interaction came
 // from. This is the documented HTTP add-on response shape — see
 // https://developers.google.com/workspace/add-ons/chat/send-messages
