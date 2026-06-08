@@ -236,8 +236,13 @@ app.post('/', async (req, res) => {
     }
 
     const crumb = await jenkins.crumb();
+    // The description stamp is audit-only — never let it block the actual gate.
     if (approve) {
-      await jenkins.setBuildDescription(buildUrl, `Approved via Google Chat by ${userEmail}`, crumb);
+      try {
+        await jenkins.setBuildDescription(buildUrl, `Approved via Google Chat by ${userEmail}`, crumb);
+      } catch (e) {
+        console.warn('build description stamp failed (non-fatal):', e.message);
+      }
     }
     await jenkins.decideInput(buildUrl, inputId, approve, crumb);
 

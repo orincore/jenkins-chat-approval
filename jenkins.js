@@ -35,7 +35,7 @@ export function createJenkinsClient({ baseUrl, user, token, fetchImpl = fetch })
       body: new URLSearchParams({ description }).toString(),
     });
     if (!res.ok) {
-      throw new Error(`set build description failed: ${res.status} ${await res.text()}`);
+      throw new Error(`set build description failed: ${res.status} ${(await res.text()).slice(0, 120)}`);
     }
   }
 
@@ -47,7 +47,7 @@ export function createJenkinsClient({ baseUrl, user, token, fetchImpl = fetch })
       headers: withHeaders(crumbToken),
     });
     if (!res.ok) {
-      throw new Error(`Jenkins ${approve ? 'proceed' : 'abort'} failed: ${res.status} ${await res.text()}`);
+      throw new Error(`Jenkins ${approve ? 'proceed' : 'abort'} failed: ${res.status} ${(await res.text()).slice(0, 120)}`);
     }
   }
 
