@@ -53,6 +53,11 @@ const {
   DIRECTORY_IMPERSONATE_USER,
 } = process.env;
 
+// For an HTTP Workspace add-on, a card button's action.function must be the FULL
+// endpoint URL (not a bare name like "approve"), or Google won't route the click.
+// Defaults to CHAT_AUDIENCE since that's already the public endpoint URL.
+const ACTION_URL = process.env.CHAT_ACTION_URL || CHAT_AUDIENCE;
+
 const app = express();
 app.use(express.json());
 
@@ -127,10 +132,15 @@ async function isApprover(userEmail) {
 /** Build the interactive approval card. `params` round-trips on every button. */
 function approvalCard({ service, build, releaseTs, buildUrl, inputId, footer }) {
   const shared = { buildUrl, inputId, service, build, releaseTs: releaseTs || '' };
-  const action = (fn) => ({
+  const action = (act) => ({
     action: {
-      function: fn,
-      parameters: Object.entries(shared).map(([key, value]) => ({ key, value: String(value) })),
+      // HTTP add-on: function MUST be the endpoint URL; the chosen action
+      // ('approve'/'reject') is passed as a parameter and read on the click.
+      function: ACTION_URL,
+      parameters: [
+        { key: 'action', value: act },
+        ...Object.entries(shared).map(([key, value]) => ({ key, value: String(value) })),
+      ],
     },
   });
   return {
@@ -205,8 +215,9 @@ app.post('/', async (req, res) => {
   // and its parameters (a key→value map) in commonEventObject.parameters.
   const body = req.body || {};
   const ceo = body.commonEventObject || {};
-  const fn = ceo.invokedFunction;
   const params = ceo.parameters || {};
+  // The action travels as a parameter (HTTP add-on); fall back to invokedFunction.
+  const fn = params.action || ceo.invokedFunction;
   const userEmail = body.chat?.user?.email || '';
   console.log('CHAT interaction:', fn || '(none)', '| user:', userEmail, '| params:', JSON.stringify(params));
 
