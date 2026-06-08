@@ -88,9 +88,16 @@ async function verifyChatRequest(req) {
     audience: CHAT_AUDIENCE,
   });
   const payload = ticket.getPayload();
-  // Google Chat signs requests with chat@system.gserviceaccount.com. Its system
-  // token does not carry an email_verified claim, so we only check the signer.
-  if (payload.email !== 'chat@system.gserviceaccount.com') {
+  // Google Chat signs request tokens with either the classic Chat system account
+  // (chat@system.gserviceaccount.com) or, for apps built as Workspace add-ons, the
+  // add-on service account (service-<projectNumber>@gcp-sa-gsuiteaddons.iam...).
+  // The token has no email_verified claim, so we just check the signer identity.
+  const signer = payload.email || '';
+  const isChatSigner =
+    signer === 'chat@system.gserviceaccount.com' ||
+    /^service-\d+@gcp-sa-gsuiteaddons\.iam\.gserviceaccount\.com$/.test(signer);
+  if (!isChatSigner) {
+    console.warn('unexpected Chat signer email:', signer);
     throw new Error('request not signed by Google Chat');
   }
   return payload;
