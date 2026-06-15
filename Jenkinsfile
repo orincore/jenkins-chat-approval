@@ -180,10 +180,11 @@ pipeline {
                     STABLE_PATH="${DEPLOY_BASE}/current/index.js"
                     ECO="${DEPLOY_BASE}/current/ecosystem.config.cjs"
 
-                    # Create ecosystem.config.cjs if not exists (CommonJS, not ES module)
-                    if [ ! -f "\$ECO" ]; then
-                        mkdir -p \$(dirname "\$ECO")
-                        cat > "\$ECO" << 'ECOEOF'
+                    # Create ecosystem.config.cjs (always, to update with latest config)
+                    mkdir -p \$(dirname "\$ECO")
+                    cat > "\$ECO" << 'ECOEOF'
+require('dotenv').config({ path: '${ENV_FILE}' });
+
 module.exports = {
   apps: [
     {
@@ -194,7 +195,6 @@ module.exports = {
       exec_mode: 'fork',
       env_production: {
         NODE_ENV: 'production',
-        PORT: 9000,
       },
       watch: false,
       max_memory_restart: '256M',
@@ -212,7 +212,6 @@ module.exports = {
   ],
 };
 ECOEOF
-                    fi
 
                     RUNNING_PATH=\$(sudo \$PM2 jlist 2>/dev/null | python3 -c "
 import sys, json
