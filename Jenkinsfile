@@ -178,9 +178,9 @@ pipeline {
                     PM2="\$(which pm2)"
 
                     STABLE_PATH="${DEPLOY_BASE}/current/index.js"
-                    ECO="${DEPLOY_BASE}/current/ecosystem.config.js"
+                    ECO="${DEPLOY_BASE}/current/ecosystem.config.cjs"
 
-                    # Create ecosystem.config.js if not exists
+                    # Create ecosystem.config.cjs if not exists (CommonJS, not ES module)
                     if [ ! -f "\$ECO" ]; then
                         mkdir -p \$(dirname "\$ECO")
                         cat > "\$ECO" << 'ECOEOF'
@@ -313,7 +313,7 @@ except Exception:
                             echo "Rolling back to: \$PREV_RELEASE"
                             ln -sfn \$PREV_RELEASE ${DEPLOY_BASE}/current
                             cd ${DEPLOY_BASE}/current
-                            sudo \$PM2 reload ecosystem.config.js --env production --update-env 2>/dev/null || sudo \$PM2 start ecosystem.config.js --env production
+                            sudo \$PM2 reload ecosystem.config.cjs --env production --update-env 2>/dev/null || sudo \$PM2 start ecosystem.config.cjs --env production
                             sudo \$PM2 save
                             echo "Rollback complete → \$PREV_RELEASE"
                         fi
