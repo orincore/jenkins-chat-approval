@@ -22,6 +22,13 @@
  */
 
 import 'dotenv/config.js';
+// Load production env file if it exists (production server at /etc/cred2tech/jenkins-chat-approval.env)
+import dotenv from 'dotenv';
+import path from 'path';
+import { fileURLToPath } from 'url';
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+dotenv.config({ path: '/etc/cred2tech/jenkins-chat-approval.env', override: true });
+
 import express from 'express';
 import { OAuth2Client } from 'google-auth-library';
 import { google } from 'googleapis';
