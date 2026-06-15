@@ -13,7 +13,7 @@ pipeline {
         APP_PORT              = '9000'
         HEALTH_URL            = 'http://localhost:9000/'
         NOTIFY_EMAIL          = 'adarsh.suradkar@cred2tech.com, cred2tech@gmail.com'
-        GIT_REPO              = 'https://github.com/adarshcred2tech/jenkins-chat-approval.git'
+        GIT_REPO              = 'https://github.com/orincore/jenkins-chat-approval.git'
     }
 
     options {
