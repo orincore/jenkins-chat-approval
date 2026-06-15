@@ -78,7 +78,29 @@ pipeline {
             }
         }
 
-        // ── 6. Approval Gate ────────────────────────────────────────────────────
+        // ── 6. Deploy GCP Credentials ──────────────────────────────────────────────
+        stage('Deploy GCP Credentials') {
+            steps {
+                script {
+                    withCredentials([file(credentialsId: 'gcp-chat-approver-key', variable: 'GCP_KEY_FILE')]) {
+                        sh '''
+                            sudo mkdir -p /etc/cred2tech/gcp-keys
+                            sudo cp $GCP_KEY_FILE /etc/cred2tech/gcp-keys/chat-approver-key.json
+                            sudo chmod 600 /etc/cred2tech/gcp-keys/chat-approver-key.json
+
+                            # Ensure GOOGLE_APPLICATION_CREDENTIALS is in the env file
+                            if ! grep -q "GOOGLE_APPLICATION_CREDENTIALS" /etc/cred2tech/jenkins-chat-approval.env; then
+                                echo "GOOGLE_APPLICATION_CREDENTIALS=/etc/cred2tech/gcp-keys/chat-approver-key.json" | sudo tee -a /etc/cred2tech/jenkins-chat-approval.env > /dev/null
+                            fi
+
+                            echo "GCP key deployed to /etc/cred2tech/gcp-keys/chat-approver-key.json"
+                        '''
+                    }
+                }
+            }
+        }
+
+        // ── 7. Approval Gate ────────────────────────────────────────────────────
         stage('Approval Gate') {
             steps {
                 script {
