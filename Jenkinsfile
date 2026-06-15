@@ -84,8 +84,11 @@ pipeline {
                 script {
                     withCredentials([file(credentialsId: 'gcp-chat-approver-key', variable: 'GCP_KEY_FILE')]) {
                         sh '''
-                            # Copy GCP key (directory must be pre-created by root with jenkins ownership)
-                            cp $GCP_KEY_FILE /etc/cred2tech/gcp-keys/chat-approver-key.json
+                            # Copy GCP key file
+                            test -f "$GCP_KEY_FILE" || { echo "GCP key file not found at $GCP_KEY_FILE"; exit 1; }
+                            test -d /etc/cred2tech/gcp-keys || { echo "Directory /etc/cred2tech/gcp-keys does not exist"; exit 1; }
+
+                            cat "$GCP_KEY_FILE" > /etc/cred2tech/gcp-keys/chat-approver-key.json
                             chmod 600 /etc/cred2tech/gcp-keys/chat-approver-key.json
 
                             # Update env file (requires write permission)
