@@ -10,8 +10,8 @@ pipeline {
         PM2_APP               = 'jenkins-chat-approval'
         DEPLOY_BASE           = '/opt/cred2tech/jenkins-chat-approval'
         ENV_FILE              = '/etc/cred2tech/jenkins-chat-approval.env'
-        APP_PORT              = '9000'
-        HEALTH_URL            = 'http://localhost:9000/'
+        APP_PORT              = '8081'
+        HEALTH_URL            = 'http://localhost:8081/'
         NOTIFY_EMAIL          = 'adarsh.suradkar@cred2tech.com, cred2tech@gmail.com'
         GIT_REPO              = 'https://github.com/orincore/jenkins-chat-approval.git'
     }
